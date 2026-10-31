@@ -1193,6 +1193,11 @@ render();
   if (!$("overlay").hidden) $("coverPick").hidden = !assets;
   $("signout").addEventListener("click", () => TS.signOut());
 })();
+document.addEventListener("error", e => {
+  const img = e.target; if (!img || img.tagName !== "IMG") return;
+  if (img.src.includes("library_600x900")) img.src = img.src.replace("library_600x900.jpg", "header.jpg");
+  else img.style.visibility = "hidden";
+}, true);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
 </body>
