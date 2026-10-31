@@ -1,0 +1,1199 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tsundoku</title>
+<meta name="theme-color" content="#0f0f10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="platform.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Karantina:wght@400;700&family=Noto+Serif+JP:wght@600&display=swap">
+<style>
+/* Layout: a reading shelf — screentone masthead, status tabs, cards with a colored "spine" on the right edge (RTL) */
+:root{
+  /* single dark look: ink black with ember orange */
+  --paper:#111110; --sheet:#1b1a19; --ink:#f2ede6; --ink-2:#a39b91; --line:#2f2c29;
+  --accent:#f0883e; --on-accent:#1a0e05; --accent-soft:#33210f; --tone:#3b342d;
+  --good:#7cc79a; --warn:#e8b34f; --bad:#ec7f72; --revisit:#d98cf0;
+  --spine-l:34%; --spine-s:40%;
+  --f-display:"Karantina","Assistant",system-ui,sans-serif;
+  --f-body:"Assistant",system-ui,"Segoe UI",Arial,sans-serif;
+  --f-jp:"Noto Serif JP","Hiragino Mincho ProN","Yu Mincho",serif;
+  color-scheme:dark;
+}
+/* one palette per shelf. manga keeps the original ink black + ember orange */
+/* anime: night-sky violet with sakura pink */
+:root[data-shelf="anime"]{
+  --paper:#17131f; --sheet:#211a2c; --ink:#efe7f5; --ink-2:#a497b3; --line:#342a44;
+  --accent:#ff7ab6; --on-accent:#2a0a1a; --accent-soft:#3e1f33; --tone:#3a2f4a;
+}
+/* comics: printer's ink navy with pop-art yellow */
+:root[data-shelf="comics"]{
+  --paper:#11151f; --sheet:#1a2030; --ink:#eef1f7; --ink-2:#9aa3b8; --line:#2b3550;
+  --accent:#ffd23f; --on-accent:#1f1800; --accent-soft:#3a3214; --tone:#2b3550;
+}
+:root[data-shelf="comics"] .mast::before{background-image:radial-gradient(#3a4566 1.6px,transparent 1.7px)}
+/* books: library green with brass */
+:root[data-shelf="books"]{
+  --paper:#121a16; --sheet:#1a2520; --ink:#ebefe8; --ink-2:#9aa89f; --line:#2b3a32;
+  --accent:#d4b06a; --on-accent:#1e1606; --accent-soft:#3a3220; --tone:#2b3a32;
+}
+/* Steam-like palette for the games shelf: deep navy, steel blue, light-blue accent, store green */
+:root[data-shelf="games"]{
+  --paper:#1b2838; --sheet:#16202d; --ink:#c7d5e0; --ink-2:#8f98a0; --line:#2a475e;
+  --accent:#66c0f4; --on-accent:#0e1a26; --accent-soft:#213a52; --tone:#2a475e;
+  --good:#a4d007; --warn:#e8b34f; --bad:#ec7f72; --revisit:#d98cf0;
+}
+:root[data-shelf="games"] body{background:linear-gradient(180deg,#171a21 0,var(--paper) 340px) var(--paper) no-repeat}
+:root[data-shelf="games"] .card{background:linear-gradient(135deg,#1e2d3d,#16202d);border-color:#22374b}
+:root[data-shelf="games"] .card:hover{border-color:var(--accent)}
+:root[data-shelf="games"] .mini.plus[data-done]{background:linear-gradient(90deg,#75b022,#588a1b);border-color:#75b022;color:#fff}
+:root[data-shelf="games"] .btn{background:linear-gradient(90deg,#47bfff,#1a44c2);border-color:#3a8fd6;color:#fff}
+:root[data-shelf="games"] .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+:root[data-shelf="games"] .bar i{background:linear-gradient(90deg,#47bfff,#66c0f4)}
+
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;display:flex;flex-direction:column;gap:20px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* masthead */
+.mast{position:relative;border-bottom:3px solid var(--accent);padding-block:8px 14px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.mast::before{content:"";position:absolute;inset:0 auto 0 0;width:min(46%,340px);background-image:radial-gradient(var(--tone) 1.3px,transparent 1.4px);background-size:7px 7px;-webkit-mask-image:linear-gradient(to right,#000,transparent);mask-image:linear-gradient(to right,#000,transparent);pointer-events:none}
+.brand{display:flex;align-items:baseline;gap:12px;position:relative}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:clamp(44px,8vw,64px);line-height:.9;margin:0;letter-spacing:.01em}
+.brand .jp{font-family:var(--f-jp);font-size:22px;color:var(--accent)}
+.stats{display:flex;gap:22px;flex-wrap:wrap;position:relative}
+.stat{display:flex;flex-direction:column}
+.stat b{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat span{font-size:12px;color:var(--ink-2);letter-spacing:.04em}
+
+.notice{font-size:14px;color:var(--warn);border:1px dashed var(--warn);border-radius:6px;padding:8px 12px}
+
+/* add bar */
+.add{display:flex;gap:8px;flex-wrap:wrap}
+.add input{flex:1 1 220px;min-width:0;background:var(--sheet);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px}
+.btn{border:1.5px solid var(--accent);background:var(--accent);color:var(--on-accent);border-radius:8px;padding:9px 16px;font-weight:600;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--ink)}
+.btn.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.kinds{display:flex;flex-wrap:wrap;border:1.5px solid var(--accent);border-radius:8px;overflow:hidden;flex:0 1 auto}
+.kind{border:none;background:transparent;padding:8px 14px;font-weight:700;color:var(--ink)}
+.kind[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+/* toolbar */
+.tools{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{border:none;background:transparent;padding:6px 12px;border-radius:999px;color:var(--ink-2);font-weight:600}
+.tab[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.tab small{font-variant-numeric:tabular-nums;opacity:.75;margin-inline-start:4px}
+.groupHead{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;border-bottom:1.5px solid var(--line);padding-block:14px 6px;margin-top:4px}
+.groupHead span{font-family:var(--f-display);font-size:28px;line-height:1;color:var(--ink)}
+.groupHead small{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tabCol{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tab small.hrs{opacity:.6;font-weight:400;margin-inline-start:6px}
+.tab small.hrs::before{content:"· "}
+.prios .tab{font-size:13px;padding:4px 10px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.moreBox{display:contents}
+.moreBox.closed{display:none}
+.moreBox.open{display:flex;gap:8px;flex-wrap:wrap;flex-basis:100%;justify-content:flex-end}
+#moreN:not(:empty){background:var(--accent);color:var(--on-accent);border-radius:999px;padding:0 7px;font-size:12px;margin-inline-start:4px}
+.folderSel{background:var(--sheet);color:var(--ink);border:1.5px solid var(--accent);border-radius:8px;padding:8px 12px;font-weight:700;font-size:15px;max-width:100%}
+.filters input,.filters select{background:var(--sheet);border:1.5px solid var(--line);border-radius:8px;padding:6px 10px;min-width:0}
+.filters input{width:160px}
+
+/* detail view */
+button.cover,button.spine{border:none;padding:0;cursor:zoom-in;font:inherit}
+button.spine{padding-block:10px}
+.titleBtn{all:unset;cursor:pointer}
+.titleBtn:hover{color:var(--accent)}
+.titleBtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.detail{width:min(720px,100%);flex-direction:row;gap:20px;align-items:flex-start;flex-wrap:wrap;position:relative}
+.dCover{flex:0 0 min(260px,100%);max-width:100%;aspect-ratio:2/3;border-radius:10px;overflow:hidden;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-jp);writing-mode:vertical-rl;font-size:22px;letter-spacing:.14em}
+.dCover img{width:100%;height:100%;object-fit:cover;display:block;writing-mode:horizontal-tb}
+.dBody{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.dBody h2{margin:0;font-family:var(--f-display);font-size:clamp(34px,6vw,48px);line-height:.95;text-wrap:balance;overflow-wrap:anywhere}
+.dBody .orig{margin:0;color:var(--ink-2);font-size:15px}
+.dFacts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:15px}
+.dFacts dt{color:var(--ink-2)}
+.dFacts dd{margin:0;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+.dNotes{margin:0;font-size:14px;color:var(--ink-2);white-space:pre-wrap}
+.dClose{position:absolute;top:10px;inset-inline-start:10px;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--line);background:var(--sheet);color:var(--ink);font-size:18px;line-height:1}
+.dClose:hover{border-color:var(--accent)}
+.detail .acts{flex-wrap:wrap;margin-top:4px}
+@media (max-width:560px){.dCover{flex-basis:100%;max-width:240px;margin-inline:auto}}
+/* random pick */
+.pick{align-items:stretch;text-align:center}
+.pickScope{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.pickCard{display:flex;flex-direction:column;align-items:center;gap:8px;padding-block:8px;min-height:220px;justify-content:center}
+.pickCard .kindTag{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--accent);border:1.5px solid var(--accent);border-radius:999px;padding:2px 12px}
+.pickCard .art{width:110px;aspect-ratio:2/3;max-width:100%;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:hsl(var(--h) var(--spine-s) var(--spine-l));color:#fff;font-family:var(--f-jp);writing-mode:vertical-rl;font-size:15px;letter-spacing:.12em}
+.pickCard .art img{width:100%;height:100%;object-fit:cover;writing-mode:horizontal-tb}
+.pickCard h3{margin:0;font-family:var(--f-display);font-size:40px;line-height:1;text-wrap:balance;overflow-wrap:anywhere}
+.pickCard p{margin:0;color:var(--ink-2);font-size:14px}
+.pickCard.spin h3{opacity:.55}
+/* recommendations */
+.recs{background:var(--accent-soft);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.recsHead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.recsHead h2{margin:0;font-family:var(--f-display);font-size:30px;line-height:1}
+.recsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.rec{background:var(--sheet);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.rec b{font-size:16px;overflow-wrap:anywhere}
+.rec p{margin:0 0 6px;font-size:14px;flex:1}
+.rec .mini{align-self:flex-start}
+.rec .mini:disabled{opacity:.5;cursor:default}
+#recsBtn{padding:6px 14px}
+/* shelf */
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{display:flex;background:var(--sheet);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:0}
+.spine{flex:0 0 52px;background:hsl(var(--h) var(--spine-s) var(--spine-l));color:#fff;display:flex;align-items:center;justify-content:center;padding-block:10px;writing-mode:vertical-rl;font-family:var(--f-jp);font-size:15px;letter-spacing:.12em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cover{flex:0 0 92px;background:var(--accent-soft);min-height:138px}
+.cover img{display:block;width:100%;height:100%;object-fit:cover}
+.coverPick{display:flex;gap:14px;align-items:center;border:1.5px dashed var(--line);border-radius:10px;padding:10px}
+.coverPick.drag{border-color:var(--accent);background:var(--accent-soft)}
+.coverPrev{flex:0 0 72px;aspect-ratio:2/3;max-width:100%;border-radius:6px;overflow:hidden;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--ink-2);font-size:12px;text-align:center}
+.coverPrev img{width:100%;height:100%;object-fit:cover;display:block}
+.cpText{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cpText .acts{flex-wrap:wrap}
+.card .body{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.card h3{margin:0;font-size:18px;line-height:1.25;text-wrap:balance;overflow-wrap:anywhere}
+.meta{margin:0;font-size:13px;color:var(--ink-2)}
+.prog{display:flex;flex-direction:column;gap:4px}
+.bar{height:6px;background:var(--accent-soft);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .25s}
+.prog span{font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto}
+.pill{font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;border:1.5px solid currentColor}
+.s-reading{color:var(--accent)} .s-completed{color:var(--good)} .s-planned{color:var(--ink-2)} .s-paused{color:var(--warn)} .s-dropped{color:var(--revisit)}
+.inl{display:flex;gap:6px;align-items:center}
+select.pill,.scoreSel{appearance:none;-webkit-appearance:none;background:transparent;cursor:pointer;font-family:inherit}
+select.pill{padding:2px 10px}
+select.pill option,.scoreSel option{color:var(--ink);background:var(--sheet);font-weight:400}
+.scoreSel{border:1.5px solid var(--line);border-radius:999px;padding:1px 10px;font-weight:700;font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums}
+.scoreSel.none{color:var(--ink-2);font-weight:400}
+select.pill:hover,.scoreSel:hover{filter:brightness(.9)}
+.acts{display:flex;gap:6px}
+.mini{border:1.5px solid var(--line);background:transparent;border-radius:6px;padding:3px 10px;font-size:13px;font-weight:600}
+.mini:hover{border-color:var(--ink)}
+.mini.plus{border-color:var(--accent);color:var(--accent)}
+
+.empty{border:2px dashed var(--line);border-radius:12px;padding:40px 20px;text-align:center;color:var(--ink-2);display:flex;flex-direction:column;align-items:center;gap:6px}
+.empty .k{font-family:var(--f-jp);font-size:44px;color:var(--tone);line-height:1}
+.empty h2{margin:0;color:var(--ink);font-size:20px}
+.empty p{margin:0;max-width:44ch}
+
+/* sheet */
+.overlay{position:fixed;inset:0;background:rgb(0 0 0 / .45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.sheet{background:var(--sheet);border-radius:12px;width:min(560px,100%);max-height:calc(100% - 32px);overflow:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.sheet h2{margin:0;font-family:var(--f-display);font-size:34px;line-height:1}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .full{grid-column:1/-1}
+@media (max-width:480px){.grid{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--ink-2);min-width:0}
+label.f input,label.f select,label.f textarea{background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-weight:400;font-size:15px;min-width:0}
+.suggest{display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto}
+.opt{display:flex;flex-direction:column;gap:2px;text-align:start;background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:8px 12px}
+.opt.more{align-items:center;color:var(--accent);font-weight:700;border-style:dashed}
+.opt:hover{border-color:var(--accent)}
+.opt b{font-size:15px}
+.opt span{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.opt em{font-size:12px;color:var(--accent);font-style:normal}
+.titlerow{display:flex;gap:8px;align-items:flex-end}
+.titlerow label{flex:1}
+.hint{font-size:12px;color:var(--ink-2);margin:0;min-height:1em}
+.foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.foot div{display:flex;gap:8px}
+
+.toast{position:fixed;inset-inline:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));margin:auto;width:fit-content;max-width:calc(100% - 32px);background:var(--accent);color:var(--on-accent);font-weight:600;padding:8px 16px;border-radius:8px;font-size:14px;z-index:30}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.login{position:fixed;inset:0;z-index:50;background:var(--bg,#0f0f10);display:grid;place-items:center;padding:16px}
+[hidden]{display:none!important}
+.login form{width:min(360px,100%);display:flex;flex-direction:column;gap:10px}
+.login h2{font-family:var(--f-display);font-size:48px;margin:0;color:var(--ink)}
+.login input{background:var(--sheet);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink);font:inherit}
+.login .linkBtn{background:none;border:none;color:var(--ink-2);text-decoration:underline;padding:4px;font:inherit}
+.signout{display:block;margin:32px auto 8px;background:none;border:none;color:var(--ink-2);font:inherit;font-size:13px;text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="login" id="login" dir="rtl" hidden>
+  <form id="loginForm">
+    <h2>Tsundoku</h2>
+    <input id="loginEmail" type="email" placeholder="אימייל" autocomplete="email" required>
+    <input id="loginPass" type="password" placeholder="סיסמה" autocomplete="current-password" minlength="6" required>
+    <button class="btn" id="loginGo" type="submit">כניסה</button>
+    <button class="linkBtn" id="loginSwitch" type="button">אין לי עדיין חשבון</button>
+    <p class="hint" id="loginMsg"></p>
+  </form>
+</div>
+
+<div class="wrap" dir="rtl" lang="he">
+  <header class="mast">
+    <div class="brand"><h1>Tsundoku</h1><span class="jp">積ん読</span></div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="notice" id="notice" hidden>הרשימה נשמרת רק בדפדפן הזה, כי שמירה בענן לא זמינה כאן כרגע.</div>
+
+  <form class="add" id="addForm" autocomplete="off">
+    <div class="kinds" id="kinds" role="group" aria-label="סוג">
+      <button type="button" class="kind" data-kind="manga" aria-pressed="true">מנגה</button>
+      <button type="button" class="kind" data-kind="anime" aria-pressed="false">אנימה</button>
+      <button type="button" class="kind" data-kind="comics" aria-pressed="false">קומיקס</button>
+      <button type="button" class="kind" data-kind="books" aria-pressed="false">ספרים</button>
+      <button type="button" class="kind" data-kind="games" aria-pressed="false">משחקים</button>
+    </div>
+    <input id="addTitle" placeholder="שם של סדרת מנגה, למשל Vagabond" aria-label="שם הסדרה">
+    <button class="btn" type="submit">הוסף למדף</button>
+  </form>
+
+  <div class="tools">
+    <div class="tabCol">
+      <div class="tabs" id="tabs" role="group" aria-label="סינון לפי סטטוס"></div>
+      <select id="folderSel" class="folderSel" aria-label="איפה המשחק עומד" hidden></select>
+      <div class="tabs prios" id="prios" role="group" aria-label="סינון לפי עדיפות" hidden></div>
+    </div>
+    <div class="filters">
+      <button class="btn ghost" type="button" id="pickBtn">תבחר לי</button>
+      <button class="btn ghost" type="button" id="recsBtn" hidden>המלצות</button>
+      <input id="q" type="search" placeholder="חיפוש" aria-label="חיפוש">
+      <button class="btn ghost" type="button" id="moreBtn" aria-expanded="false" hidden>סינון ומיון <span id="moreN"></span></button>
+      <div class="moreBox" id="moreBox">
+      <select id="sort" aria-label="מיון">
+        <option value="updated">עודכן לאחרונה</option>
+        <option value="title">ABC</option>
+        <option value="creator" id="sortCreator">לפי יוצר</option>
+        <option value="series">לפי סדרה</option>
+        <option value="score" id="sortScore">לפי ציון</option>
+        <option value="progress">לפי התקדמות</option>
+        <option value="hours" id="sortHours" hidden>לפי שעות משחק</option>
+      </select>
+      <select id="platF" aria-label="סינון לפי פלטפורמה" hidden>
+        <option value="Steam" selected>Steam</option>
+        <option value="all">כל הפלטפורמות</option>
+        <option value="PlayStation">PlayStation</option>
+        <option value="Nintendo Switch">Nintendo Switch</option>
+        <option value="other">אחר</option>
+      </select>
+      <select id="hoursF" aria-label="סינון לפי שעות משחק" hidden>
+        <option value="all">כל השעות</option>
+        <option value="0">עוד לא שיחקתי</option>
+        <option value="0-5">עד 5 שעות</option>
+        <option value="5-20">5–20 שעות</option>
+        <option value="20-50">20–50 שעות</option>
+        <option value="50-">50+ שעות</option>
+      </select>
+      </div>
+    </div>
+  </div>
+
+  <section class="recs" id="recs" hidden>
+    <div class="recsHead">
+      <h2 id="recsTitle">המלצות בשבילך</h2>
+      <div class="acts"><button class="mini" type="button" id="recsRefresh">רענן</button><button class="mini" type="button" id="recsClose">סגור</button></div>
+    </div>
+    <p class="hint" id="recsHint"></p>
+    <div class="recsGrid" id="recsGrid"></div>
+  </section>
+
+  <div class="yearEnd" id="yearEnd" hidden><button class="btn ghost" type="button" id="yearEndBtn"></button></div>
+  <main class="shelf" id="shelf"></main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <form class="sheet" id="sheet" autocomplete="off">
+    <h2 id="sheetTitle">סדרה חדשה</h2>
+    <div class="titlerow">
+      <label class="f">שם הסדרה<input id="f_title" required></label>
+      <button class="btn ghost" type="button" id="fillBtn" hidden>חפש התאמות</button>
+    </div>
+    <p class="hint" id="fillHint"></p>
+    <div class="suggest" id="suggest" hidden></div>
+    <div class="coverPick" id="coverPick" hidden>
+      <div class="coverPrev" id="coverPrev">אין כריכה</div>
+      <div class="cpText">
+        <div class="acts">
+          <label class="btn ghost" for="f_cover">בחר כריכה</label>
+          <button class="btn ghost" type="button" id="coverRemove" hidden>הסר</button>
+        </div>
+        <input type="file" id="f_cover" accept="image/*" hidden>
+        <p class="hint">אפשר גם להדביק תמונה (Ctrl+V) או לגרור אותה לכאן.</p>
+      </div>
+    </div>
+    <div class="grid">
+      <label class="f"><span id="l_titleJa">שם ביפנית</span><input id="f_titleJa" dir="auto"></label>
+      <label class="f"><span id="l_author">מחבר/ת</span><input id="f_author" dir="auto"></label>
+      <label class="f" id="lf_publisher" hidden>הוצאה<input id="f_publisher" dir="auto" placeholder="למשל Image"></label>
+      <label class="f" id="lf_lang" hidden>שפת קריאה
+        <select id="f_lang"><option value="he">עברית</option><option value="en">English</option></select></label>
+      <label class="f" id="lf_prio" hidden>עדיפות
+        <select id="f_prio"><option value="">בלי</option><option value="2026">🔥 עד סוף 2026</option><option value="year">⭐ השנה, אם יסתדר</option><option value="backlog">📚 Backlog</option></select></label>
+      <label class="f" id="lf_platform" hidden>פלטפורמה
+        <select id="f_platform"><option value="">לא נבחרה</option><option>Steam</option><option>Steam Deck</option><option>Nintendo Switch</option><option>PlayStation</option><option>Xbox</option><option>PC (אחר)</option><option>מובייל</option></select></label>
+      <label class="f" id="lf_unit" hidden>סופר לפי
+        <select id="f_unit"><option value="issues">גיליונות</option><option value="volumes">כרכים (TPB)</option><option value="albums">אלבומים</option></select></label>
+      <label class="f"><span id="l_status">סטטוס קריאה</span>
+        <select id="f_status"></select></label>
+      <label class="f" id="lf_pub"><span id="l_pub">סטטוס פרסום</span>
+        <select id="f_pub"><option value="">לא ידוע</option><option value="ongoing" id="o_ongoing">עדיין יוצאת</option><option value="finished">הסתיימה</option></select></label>
+      <label class="f"><span id="l_vol">כרכים שקראתי</span><input id="f_vol" type="number" min="0" step="any" inputmode="decimal"></label>
+      <label class="f"><span id="l_total">סה״כ כרכים</span><input id="f_total" type="number" min="0" inputmode="numeric" placeholder="לא ידוע"></label>
+      <label class="f" id="lf_books" hidden>ספרים שסיימתי בסדרה<input id="f_books" type="number" min="0" inputmode="numeric"></label>
+      <label class="f" id="lf_tbooks" hidden>סה״כ ספרים בסדרה<input id="f_tbooks" type="number" min="1" inputmode="numeric" placeholder="1 (ספר בודד)"></label>
+      <label class="f" id="lf_ch">פרקים שקראתי<input id="f_ch" type="number" min="0" inputmode="numeric"></label>
+      <label class="f" id="lf_score">ציון (1–10)
+        <select id="f_score"><option value="0">בלי ציון</option></select></label>
+      <label class="f full">הערות<textarea id="f_notes" rows="2" dir="auto"></textarea></label>
+    </div>
+    <div class="foot">
+      <button class="btn danger" type="button" id="delBtn">מחק</button>
+      <div><button class="btn ghost" type="button" id="cancelBtn">ביטול</button><button class="btn" type="submit">שמור</button></div>
+    </div>
+  </form>
+</div>
+<div class="overlay" id="pickOverlay" hidden>
+  <div class="sheet pick" role="dialog" aria-labelledby="pickHead">
+    <div class="pickScope" role="group" aria-label="מאיפה להגריל">
+      <button type="button" class="tab" data-scope="all" aria-pressed="true">מכל המדפים</button>
+      <button type="button" class="tab" data-scope="kind" aria-pressed="false" id="pickKindBtn">רק מהמדף הזה</button>
+      <button type="button" class="tab" data-scope="2026" aria-pressed="false">🔥 משחקים עד סוף 2026</button>
+    </div>
+    <div class="pickCard" id="pickCard"></div>
+    <div class="foot">
+      <button class="btn ghost" type="button" id="pickClose">סגור</button>
+      <div><button class="btn ghost" type="button" id="pickAgain">הגרל שוב</button><button class="btn" type="button" id="pickStart">יאללה, מתחיל</button></div>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="detailOverlay" hidden>
+  <div class="sheet detail" role="dialog" aria-labelledby="dTitle" id="detail"></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<button class="signout" id="signout" type="button">התנתק</button>
+<script>
+const STATUS = {reading:"קורא עכשיו", planned:"מתוכנן", completed:"סיימתי", paused:"השנה", dropped:"שווה חזרה"};
+/* paused = finished during the current year (moved to completed at year end); dropped = finished and wants to revisit */
+const VERB = {manga: ["קראתי", "לקריאה חוזרת"], comics: ["קראתי", "לקריאה חוזרת"], books: ["קראתי", "לקריאה חוזרת"], anime: ["ראיתי", "לצפייה חוזרת"], games: ["שיחקתי", "לשחק שוב"]};
+const $ = id => document.getElementById(id);
+let items = [], filter = "reading", store = null, sample = null, assets = null, editingId = null;
+let pendingCover; // undefined = unchanged, null = remove, Blob = new image
+
+/* ---------- covers ---------- */
+function shrink(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, 600 / img.naturalWidth), c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? res(b) : rej(), "image/jpeg", .85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(); };
+    img.src = url;
+  });
+}
+function showCoverPreview(src){
+  $("coverPrev").innerHTML = src ? `<img src="${esc(src)}" alt="">` : "אין כריכה";
+  $("coverRemove").hidden = !src;
+}
+async function takeCover(file){
+  if (!file || !file.type.startsWith("image/")) return toast("זה לא קובץ תמונה");
+  try { pendingCover = await shrink(file); showCoverPreview(URL.createObjectURL(pendingCover)); }
+  catch { toast("לא הצלחתי לקרוא את התמונה"); }
+}
+async function saveCover(old){
+  if (pendingCover === undefined) return {};
+  const oldId = old?.coverId;
+  let patch;
+  if (pendingCover === null) patch = {coverId: "", coverUrl: ""};
+  else { const r = await assets.upload(pendingCover); patch = {coverId: r.id, coverUrl: r.url}; }
+  return {...patch, _oldCover: oldId || ""};
+}
+
+/* ---------- storage: cloud (db) with a local fallback ---------- */
+function localStore(){
+  const KEY = "dokusho-series";
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
+  const write = list => { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {} };
+  return {
+    start(cb){ cb(read()); this.cb = cb; },
+    async add(d){ const l = read(); l.push({...d, id: "s" + Date.now().toString(36)}); write(l); this.cb(l); },
+    async patch(id, p){ const l = read().map(x => x.id === id ? {...x, ...p} : x); write(l); this.cb(l); },
+    async remove(id){ const l = read().filter(x => x.id !== id); write(l); this.cb(l); }
+  };
+}
+function cloudStore(db){
+  const col = db.collection("series");
+  const chains = {};
+  const serial = (id, fn) => (chains[id] = (chains[id] || Promise.resolve()).then(fn, fn));
+  return {
+    start(cb){
+      col.onSnapshot(s => cb(s.docs.map(d => ({id: d.id, ...d.data()}))),
+        () => toast("החיבור לשמירה נותק. רענן את הדף."));
+    },
+    add: d => col.add(d),
+    patch: (id, p) => serial(id, () => col.doc(id).update(p)),
+    remove: id => serial(id, () => col.doc(id).delete())
+  };
+}
+
+/* ---------- kinds: manga & anime ---------- */
+let kind = "manga";
+try { const k0 = localStorage.getItem("dokusho-kind"); if (["anime", "comics", "books", "games"].includes(k0)) kind = k0; } catch {}
+if (kind === "games") filter = "playing";
+const K = {
+  manga: {reading: "קורא עכשיו", unit: "כרך", units: "כרכים", plus: "+1 כרך", plusAria: "הוסף כרך שקראתי",
+    who: "מחבר/ת", done: "כרכים שקראתי", total: "סה״כ כרכים", statusL: "סטטוס קריאה", pubL: "סטטוס פרסום",
+    ongoing: "עדיין יוצאת", ph: "שם של סדרת מנגה, למשל Vagabond", jp: "読書", empty: "本棚",
+    statUnits: "כרכים נקראו", emptyText: "כתוב למעלה שם של מנגה שאתה קורא או רוצה לקרוא ולחץ \"הוסף למדף\". האפליקציה תמלא מחבר ומספר כרכים.",
+    P: "volumesRead", T: "totalVolumes"},
+  anime: {reading: "צופה עכשיו", unit: "פרק", units: "פרקים", plus: "+1 פרק", plusAria: "הוסף פרק שראיתי",
+    who: "סטודיו", done: "פרקים שראיתי", total: "סה״כ פרקים", statusL: "סטטוס צפייה", pubL: "סטטוס שידור",
+    ongoing: "עדיין משודרת", ph: "שם של אנימה, למשל Frieren", jp: "視聴", empty: "アニメ",
+    statUnits: "פרקים נצפו", emptyText: "כתוב למעלה שם של אנימה שאתה רואה או רוצה לראות ולחץ \"הוסף למדף\". האפליקציה תמלא סטודיו ומספר פרקים.",
+    P: "episodesWatched", T: "totalEpisodes"},
+  comics: {reading: "קורא עכשיו", unit: "גיליון", units: "גיליונות", plus: "+1", plusAria: "הוסף אחד שקראתי",
+    who: "כותב/ת ומאייר/ת", done: "גיליונות שקראתי", total: "סה״כ גיליונות", statusL: "סטטוס קריאה", pubL: "סטטוס פרסום",
+    ongoing: "עדיין יוצא", ph: "שם של קומיקס, למשל Saga או Blacksad", jp: "コミック", empty: "コミック",
+    statUnits: "גיליונות וכרכים נקראו", emptyText: "כתוב למעלה שם של קומיקס שאתה קורא או רוצה לקרוא ולחץ \"הוסף למדף\". האפליקציה תמלא יוצרים, הוצאה וכמות.",
+    P: "unitsRead", T: "totalUnits"}
+};
+K.books = {reading: "קורא עכשיו", unit: "פרק", units: "פרקים", plusAria: "הוסף פרק שקראתי",
+  who: "סופר/ת", done: "פרק נוכחי", total: "סה״כ פרקים בספר", statusL: "סטטוס קריאה", pubL: "", ongoing: "",
+  ph: "שם של ספר או סדרה, למשל Dune", jp: "本", empty: "本", statUnits: "ספרים נקראו", orig: "שם בשפה השנייה",
+  emptyText: "כתוב למעלה שם של ספר או סדרת ספרים ולחץ \"הוסף למדף\". האפליקציה תמלא סופר, מספר ספרים בסדרה ומספר פרקים.",
+  P: "chapter", T: "totalChapters"};
+K.games = {reading: "משחק עכשיו", unit: "שעה", units: "שעות", plusAria: "הוסף שעת משחק",
+  who: "מפתח", done: "שעות ששיחקתי", total: "שעות להשלמה (בערך)", statusL: "סטטוס משחק", pubL: "", ongoing: "",
+  ph: "שם של משחק, למשל Hollow Knight", jp: "ゲーム", empty: "ゲーム", statUnits: "שעות משחק", orig: "שם מקורי",
+  emptyText: "כתוב למעלה שם של משחק שאתה משחק או רוצה לשחק ולחץ \"הוסף למדף\". האפליקציה תמלא מפתח וזמן משחק משוער.",
+  P: "hoursPlayed", T: "hoursToBeat"};
+const UNITS = {issues: ["גיליון", "גיליונות"], volumes: ["כרך", "כרכים"], albums: ["אלבום", "אלבומים"]};
+const kindOf = x => ["anime", "comics", "books", "games"].includes(x.type) ? x.type : "manga";
+const stepOf = x => K[kindOf(x)].step || 1;
+const unitOf = x => kindOf(x) === "comics" ? UNITS[x.comicUnit] || UNITS.issues : [K[kindOf(x)].unit, K[kindOf(x)].units];
+const P = x => x[K[kindOf(x)].P] || 0;
+const T = x => x[K[kindOf(x)].T] || 0;
+const statusLabel = (s, k) => s === "reading" ? K[k].reading
+  : s === "paused" ? `${(VERB[k] || VERB.manga)[0]} השנה`
+  : s === "dropped" ? (VERB[k] || VERB.manga)[1]
+  : STATUS[s] || "";
+const mine = () => items.filter(x => kindOf(x) === kind);
+
+let lastSortKind = null;
+function applyKind(){
+  const g = kind === "games";
+  document.documentElement.dataset.shelf = kind;
+  $("hoursF").hidden = $("sortHours").hidden = $("platF").hidden = !g;
+  $("sortScore").hidden = g;
+  if (g && kind !== lastSortKind) $("sort").value = "hours";
+  if ((!g && $("sort").value === "hours") || (g && $("sort").value === "score")) $("sort").value = "updated";
+  lastSortKind = kind;
+  const sc = $("sortCreator"); if (sc) sc.textContent = `לפי ${CREATOR_L[kind]}`;
+  document.querySelectorAll(".kind").forEach(b => b.setAttribute("aria-pressed", b.dataset.kind === kind));
+  $("addTitle").placeholder = K[kind].ph;
+  $("recsBtn").hidden = !sample || !["anime", "manga"].includes(kind);
+  if ($("recsBtn").hidden) recsOpen = false;
+}
+
+/* ---------- rendering ---------- */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+
+const r1 = n => Math.round((Number(n) || 0) * 10) / 10;
+function renderStats(){
+  const list = mine();
+  const units = kind === "books"
+    ? list.reduce((a, x) => a + (isSeries(x) ? (x.status === "completed" ? x.totalBooks : x.booksRead || 0) : x.status === "completed" ? 1 : 0), 0)
+    : list.reduce((a, x) => a + P(x), 0);
+  const scored = list.filter(x => x.score > 0);
+  const avg = scored.length ? (scored.reduce((a, x) => a + x.score, 0) / scored.length).toFixed(1) : "–";
+  $("stats").innerHTML = [
+    [list.length, {games: "משחקים", books: "ספרים", comics: "חוברות", manga: "כרכים", anime: "סדרות"}[kind]], [r1(units).toLocaleString("en-US"), K[kind].statUnits],
+    [list.filter(x => x.status === "completed").length, "הושלמו"], ...(kind === "games" ? [] : [[avg, "ציון ממוצע"]])
+  ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
+}
+
+const PRIO = {"2026": "🔥 עד סוף 2026", year: "⭐ השנה, אם יסתדר", backlog: "📚 Backlog"};
+let prioFilter = "all";
+/* games use the user's own Steam folders instead of statuses */
+const FOLDERS = [["playing", "🎮 משחק עכשיו"], ["2026", "🔥 עד סוף 2026"], ["year", "⭐ השנה, אם יסתדר"], ["backlog", "📚 Backlog"], ["done", "✅ סיימתי לפחות פעם אחת"]];
+const FOLDER_L = Object.fromEntries(FOLDERS);
+const folderOf = x => x.status === "completed" ? "done" : x.status === "reading" ? "playing" : (x.prio || "backlog");
+const folderPatch = f => f === "done" ? {status: "completed"} : f === "playing" ? {status: "reading"} : {status: "planned", prio: f};
+const defaultFilter = k => k === "games" ? "playing" : "reading";
+const PLAT_MAIN = ["Steam", "Steam Deck", "PlayStation", "Nintendo Switch"];
+const matchPlat = x => {
+  if (kindOf(x) !== "games") return true;
+  const v = $("platF").value, p = x.platform || "";
+  if (v === "all") return true;
+  if (v === "Steam") return p === "Steam" || p === "Steam Deck";
+  if (v === "other") return !PLAT_MAIN.includes(p);
+  return p === v;
+};
+const matchHours = x => {
+  if (kindOf(x) !== "games") return true;
+  const v = $("hoursF").value; if (v === "all") return true;
+  const h = x.hoursPlayed || 0; if (v === "0") return h === 0;
+  const [lo, hi] = v.split("-").map(n => n === "" ? Infinity : Number(n));
+  return (lo === 0 ? h > 0 : h >= lo) && h < hi;
+};
+const matchFilter = x => filter === "all" || (kindOf(x) === "games" ? folderOf(x) === filter : x.status === filter);
+function renderPrios(){
+  const show = false;
+  $("prios").hidden = !show; if (!show) return;
+  const list = mine().filter(x => filter === "all" || x.status === filter);
+  const cnt = k => k === "all" ? list.length : list.filter(x => x.prio === k).length;
+  $("prios").innerHTML = [["all", "כל העדיפויות"], ...Object.entries(PRIO)].map(([k, l]) =>
+    `<button class="tab" data-p="${k}" aria-pressed="${prioFilter === k}">${l}<small>${cnt(k)}</small></button>`).join("");
+}
+function renderTabs(){
+  const games = kind === "games";
+  const list = mine().filter(matchPlat);
+  const count = k => k === "all" ? list.length : list.filter(x => games ? folderOf(x) === k : x.status === k).length;
+  const hours = k => r1((k === "all" ? list : list.filter(x => folderOf(x) === k)).reduce((a, x) => a + (x.hoursPlayed || 0), 0)).toLocaleString("en-US");
+  const tabs = games ? FOLDERS : Object.keys(STATUS).map(k => [k, statusLabel(k, kind)]);
+  $("tabs").hidden = games; $("folderSel").hidden = !games;
+  if (games){
+    $("folderSel").innerHTML = [...tabs, ["all", "הכל"]].map(([k, l]) =>
+      `<option value="${k}"${filter === k ? " selected" : ""}>${l} · ${count(k)} · ${hours(k)} ש׳</option>`).join("");
+    return;
+  }
+  $("tabs").innerHTML = [...tabs, ["all", "הכל"]].map(([k, l]) =>
+    `<button class="tab" data-k="${k}" aria-pressed="${filter === k}">${l}<small>${count(k)}</small>${games ? `<small class="hrs">${hours(k)} ש׳</small>` : ""}</button>`).join("");
+}
+
+const isSeries = x => kindOf(x) === "books" && x.totalBooks > 1;
+function progressText(x){
+  if (kindOf(x) === "books"){
+    const parts = [];
+    if (isSeries(x)) parts.push(x.status === "completed" ? `${x.totalBooks} ספרים` : `ספר ${Math.min((x.booksRead || 0) + 1, x.totalBooks)} מתוך ${x.totalBooks}${x.pubStatus === "ongoing" ? " שיצאו עד עכשיו" : ""}`);
+    if (x.status !== "completed" || !isSeries(x)) parts.push(x.totalChapters ? `פרק ${x.chapter || 0} מתוך ${x.totalChapters}` : `פרק ${x.chapter || 0}`);
+    return parts.join(" · ");
+  }
+  const [u, us] = unitOf(x), v = r1(P(x)), t = r1(T(x));
+  const so = x.pubStatus === "ongoing" ? (kindOf(x) === "anime" ? " ששודרו" : " שיצאו עד עכשיו") : "";
+  let s = t ? `${u} ${v} מתוך ${t}${so}` : `${v} ${us}`;
+  if (kindOf(x) === "manga" && x.chaptersRead) s += ` · פרק ${x.chaptersRead}`;
+  return s;
+}
+const pct = x => {
+  if (isSeries(x)) return Math.min(100, Math.round(((x.booksRead || 0) + (x.totalChapters ? (x.chapter || 0) / x.totalChapters : 0)) / x.totalBooks * 100));
+  return T(x) ? Math.min(100, Math.round(P(x) / T(x) * 100)) : 0;
+};
+const hasBar = x => isSeries(x) || !!T(x);
+
+const cardHTML = x => { const k = K[kindOf(x)]; return `
+    <article class="card">
+      ${x.coverUrl ? `<button class="cover" data-open="${x.id}" aria-label="הצג בגדול: ${esc(x.title)}"><img src="${esc(x.coverUrl)}" alt="" loading="lazy"></button>`
+        : `<button class="spine" data-open="${x.id}" style="--h:${hue(x.title)}" aria-label="הצג בגדול: ${esc(x.title)}">${esc(x.titleJa || x.title)}</button>`}
+      <div class="body">
+        <h3 dir="auto"><button class="titleBtn" data-open="${x.id}">${esc(x.title)}</button></h3>
+        ${x.author || x.publisher || x.platform || x.lang || x.pubStatus || x.prio ? `<p class="meta">${[esc(x.author), esc(x.publisher), kindOf(x) === "games" && x.prio ? PRIO[x.prio] : "", esc(x.platform), kindOf(x) === "books" && x.lang ? (x.lang === "en" ? "באנגלית" : "בעברית") : "", x.pubStatus === "ongoing" ? k.ongoing : x.pubStatus === "finished" ? "הסתיימה" : ""].filter(Boolean).join(" · ")}</p>` : ""}
+        <div class="prog">${hasBar(x) ? `<div class="bar"><i style="width:${pct(x)}%"></i></div>` : ""}<span>${progressText(x)}</span></div>
+        <div class="row">
+          <div class="inl">
+            ${kindOf(x) === "games"
+              ? `<select class="pill s-${folderOf(x) === "done" ? "completed" : "planned"}" data-folder="${x.id}" aria-label="תיקייה">${FOLDERS.map(([k, l]) =>
+                `<option value="${k}"${k === folderOf(x) ? " selected" : ""}>${l}</option>`).join("")}</select>`
+              : `<select class="pill s-${x.status}" data-status="${x.id}" aria-label="סטטוס">${Object.keys(STATUS).map(k =>
+                `<option value="${k}"${k === x.status ? " selected" : ""}>${statusLabel(k, kindOf(x))}</option>`).join("")}</select>`}
+            ${kindOf(x) === "games" ? "" : `<select class="scoreSel${x.score ? "" : " none"}" data-score="${x.id}" aria-label="ציון"><option value="0">★ –</option>${[10,9,8,7,6,5,4,3,2,1].map(n =>
+              `<option value="${n}"${n === x.score ? " selected" : ""}>★ ${n}</option>`).join("")}</select>`}
+          </div>
+          <div class="acts">
+            ${kindOf(x) === "games" && x.status === "reading" ? `<button class="mini plus" data-done="${x.id}" aria-label="סיימתי את המשחק">✅ סיימתי</button>` : ""}
+            ${kindOf(x) !== "games" && (x.status === "reading" || x.status === "planned") ? `<button class="mini plus" data-plus="${x.id}" aria-label="${k.plusAria}">+1 ${unitOf(x)[0]}</button>${kindOf(x) === "books" ? `<button class="mini plus" data-book="${x.id}" aria-label="סיימתי ספר">+1 ספר</button>` : ""}` : ""}
+            ${x.status === "reading" && kindOf(x) !== "games" ? `<button class="mini" data-back="${x.id}" aria-label="החזר למתוכנן">החזר למתוכנן</button>` : ""}
+            <button class="mini" data-edit="${x.id}">עריכה</button>
+          </div>
+        </div>
+      </div>
+    </article>`; };
+function renderShelf(){
+  const q = $("q").value.trim().toLowerCase();
+  const all = mine();
+  let list = all.filter(x => matchFilter(x) && matchHours(x) && matchPlat(x) &&
+    (!q || [x.title, x.titleJa, x.author, x.publisher].some(s => String(s || "").toLowerCase().includes(q))));
+  const s = $("sort").value;
+  const byTitle = (a, b) => String(a.title).localeCompare(String(b.title), undefined, {sensitivity: "base", numeric: true});
+  if (s === "creator" || s === "series") return renderGrouped(list, s, all.length);
+  list.sort(s === "title" ? byTitle
+    : s === "score" ? (a, b) => (b.score || 0) - (a.score || 0)
+    : s === "progress" ? (a, b) => pct(b) - pct(a)
+    : s === "hours" ? (a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0)
+    : (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  if (!all.length){
+    $("shelf").innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="k">${K[kind].empty}</div>
+      <h2>המדף עוד ריק</h2><p>${K[kind].emptyText}</p></div>`;
+    return;
+  }
+  if (!list.length){ $("shelf").innerHTML = `<div class="empty" style="grid-column:1/-1"><h2>אין כאן כלום</h2><p>שום סדרה לא מתאימה לסינון הזה.</p></div>`; return; }
+
+  $("shelf").innerHTML = list.map(cardHTML).join("");
+}
+function renderYearEnd(){
+  const n = mine().filter(x => x.status === "paused").length;
+  $("yearEnd").hidden = filter !== "paused" || !n;
+  if (!$("yearEndBtn").dataset.armed) $("yearEndBtn").textContent = `סוף שנה: העבר את כל ה-${n} ל"סיימתי"`;
+}
+/* ---------- grouping: creator / series ---------- */
+let steamMeta = {};
+const CREATOR_L = {manga: "מחבר", anime: "סטודיו", comics: "הוצאה", books: "סופר", games: "מפרסם"};
+function creatorOf(x){
+  const k = kindOf(x), sm = x.steamId ? steamMeta[x.steamId] : null;
+  if (k === "games") return x.publisher || (sm && sm[0]) || x.author || "";
+  if (k === "comics") return x.publisher || x.author || "";
+  return x.author || "";
+}
+function deriveSeries(title){
+  let t = String(title || "").replace(/[™®©]/g, "").trim();
+  t = t.split(/\s*[:\-–—]\s+/)[0];
+  t = t.replace(/\s*\((19|20)\d\d\)$/, "");
+  for (let i = 0; i < 3; i++) t = t.replace(/\s+(Season\s*\d+|\d+(st|nd|rd|th)\s+Season|Part\s*\d+|Final Season.*|The Movie.*|Movie.*|OVA|Specials?)$/i, "");
+  for (let i = 0; i < 2; i++) t = t.replace(/\s+(\d{1,2}|[IVX]{1,4}|Remastered|Remake|Definitive Edition|GOTY.*|Game of the Year.*|Complete Edition|Enhanced Edition|Director's Cut|HD|Classic|Anniversary.*|Shippuden|Kai|Brotherhood|R|Z)$/i, "");
+  return t.trim();
+}
+function seriesOf(x){
+  const sm = x.steamId ? steamMeta[x.steamId] : null;
+  return x.series || (sm && sm[1]) || deriveSeries(x.title) || x.title;
+}
+function renderGrouped(list, mode, total){
+  const keyOf = mode === "creator" ? x => creatorOf(x) : x => seriesOf(x);
+  const groups = new Map();
+  for (const x of list){ const k = keyOf(x) || ""; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); }
+  const byTitle = (a, b) => String(a.title).localeCompare(String(b.title), undefined, {sensitivity: "base", numeric: true});
+  let keys = [...groups.keys()].filter(k => k);
+  let loose = groups.get("") || [];
+  if (mode === "series"){ keys = keys.filter(k => { if (groups.get(k).length > 1) return true; loose = loose.concat(groups.get(k)); return false; }); }
+  keys.sort((a, b) => a.localeCompare(b, undefined, {sensitivity: "base", numeric: true}));
+  const section = (label, arr) => `<div class="groupHead" dir="auto"><span>${esc(label)}</span><small>${arr.length}</small></div>` + arr.sort(byTitle).map(cardHTML).join("");
+  let html = keys.map(k => section(k, groups.get(k))).join("");
+  if (loose.length) html += section(mode === "series" ? "לא בסדרה" : `בלי ${CREATOR_L[kind]}`, loose);
+  $("shelf").innerHTML = html || `<div class="empty" style="grid-column:1/-1"><h2>אין כאן כלום</h2><p>שום סדרה לא מתאימה לסינון הזה.</p></div>`;
+}
+function render(){ applyKind(); renderStats(); renderTabs(); renderPrios(); renderShelf(); renderRecs(); renderYearEnd(); renderMore(); }
+
+/* ---------- actions ---------- */
+let toastTimer;
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
+const fail = () => toast("השמירה נכשלה. נסה שוב.");
+
+const plusTimers = {};
+function plusOne(id){
+  const x = items.find(i => i.id === id); if (!x) return;
+  const f = K[kindOf(x)].P;
+  x[f] = (x[f] || 0) + 1;
+  if (kindOf(x) === "books" && T(x)) x[f] = Math.min(x[f], T(x));
+  if (x.status === "planned") x.status = "reading";
+  if (T(x) && P(x) >= T(x) && (x.pubStatus === "finished" || (kindOf(x) === "books" && !isSeries(x)))){ x.status = "completed"; toast(`סיימת את ${x.title} 🎉`); }
+  x.updatedAt = Date.now();
+  render();
+  clearTimeout(plusTimers[id]);
+  plusTimers[id] = setTimeout(() => store.patch(id, {[f]: x[f], status: x.status, updatedAt: x.updatedAt}).catch(fail), 700);
+}
+
+function plusBook(id){
+  const x = items.find(i => i.id === id); if (!x) return;
+  clearTimeout(plusTimers[id]);
+  const total = isSeries(x) ? x.totalBooks : 1;
+  x.booksRead = Math.min((x.booksRead || 0) + 1, total);
+  if (total > 1) { x.chapter = 0; x.totalChapters = null; }
+  if (x.status === "planned") x.status = "reading";
+  if (x.booksRead >= total){ x.status = "completed"; if (x.totalChapters) x.chapter = x.totalChapters; toast(total > 1 ? `סיימת את כל הסדרה ${x.title} 🎉` : `סיימת את ${x.title} 🎉`); }
+  else toast(`עברת לספר ${x.booksRead + 1} מתוך ${x.totalBooks}`);
+  x.updatedAt = Date.now();
+  render();
+  store.patch(id, {booksRead: x.booksRead, chapter: x.chapter || 0, totalChapters: x.totalChapters ?? null, status: x.status, updatedAt: x.updatedAt}).catch(fail);
+}
+
+let sheetKind = "manga";
+function setSheetKind(k){
+  sheetKind = k; const L = K[k];
+  $("l_author").textContent = L.who; $("l_status").textContent = L.statusL; $("l_pub").textContent = L.pubL;
+  $("l_vol").textContent = L.done; $("l_total").textContent = L.total; $("o_ongoing").textContent = L.ongoing;
+  $("lf_ch").hidden = k !== "manga";
+  $("lf_score").hidden = k === "games";
+  $("lf_publisher").hidden = $("lf_unit").hidden = k !== "comics";
+  $("lf_platform").hidden = $("lf_prio").hidden = k !== "games";
+  $("lf_lang").hidden = $("lf_books").hidden = $("lf_tbooks").hidden = k !== "books";
+  $("lf_pub").hidden = k === "games";
+  if (k === "books") { $("l_pub").textContent = "סטטוס הסדרה"; $("o_ongoing").textContent = "עדיין יוצאים ספרים"; }
+  $("l_titleJa").textContent = L.orig || "שם ביפנית";
+  if (k === "comics") setUnitLabels();
+  $("f_status").innerHTML = Object.keys(STATUS).map(s => `<option value="${s}">${statusLabel(s, k)}</option>`).join("");
+}
+function fillForm(x){
+  $("f_title").value = x.title || ""; $("f_titleJa").value = x.titleJa || ""; $("f_author").value = x.author || "";
+  $("f_status").value = x.status || "planned"; $("f_pub").value = x.pubStatus || "";
+  $("f_vol").value = P(x); $("f_total").value = T(x) || "";
+  $("f_books").value = x.booksRead || ""; $("f_tbooks").value = x.totalBooks || "";
+  $("f_ch").value = x.chaptersRead || ""; $("f_score").value = x.score || 0; $("f_notes").value = x.notes || "";
+  $("f_platform").value = x.platform || ""; $("f_prio").value = x.prio || ""; $("f_lang").value = x.lang || "he"; $("f_publisher").value = x.publisher || ""; $("f_unit").value = x.comicUnit || "issues";
+  if (sheetKind === "comics") setUnitLabels();
+}
+function setUnitLabels(){
+  const [, us] = UNITS[$("f_unit").value] || UNITS.issues;
+  $("l_vol").textContent = `${us} שקראתי`; $("l_total").textContent = `סה״כ ${us}`;
+}
+function openSheet(id, presetTitle){
+  editingId = id || null;
+  const x = id ? items.find(i => i.id === id) : {type: kind, title: presetTitle || "", status: "planned", platform: kind === "games" && $("platF").value !== "all" && $("platF").value !== "other" ? $("platF").value : "", lang: /[\u0590-\u05FF]/.test(presetTitle || "") ? "he" : "en"};
+  setSheetKind(kindOf(x));
+  fillForm(x);
+  $("sheetTitle").textContent = id ? "עריכה" : ({manga: "מנגה חדשה", anime: "אנימה חדשה", comics: "קומיקס חדש", books: "ספר חדש", games: "משחק חדש"}[kind]);
+  $("delBtn").hidden = !id; $("delBtn").textContent = "מחק"; $("delBtn").dataset.armed = "";
+  $("fillHint").textContent = ""; $("suggest").hidden = true; picked = null; fillCtl?.abort();
+  pendingCover = undefined; $("f_cover").value = "";
+  $("coverPick").hidden = !assets; showCoverPreview(x.coverUrl);
+  $("overlay").hidden = false; $("f_title").focus();
+  if (!id && presetTitle && sample) autoFill();
+}
+const closeSheet = () => { $("overlay").hidden = true; editingId = null; clearTimeout(typeTimer); fillCtl?.abort(); };
+
+function readForm(){
+  const n = id => { const v = $(id).value.trim(); /* integers */ return v === "" ? null : Math.max(0, parseInt(v, 10) || 0); };
+  const L = K[sheetKind];
+  const d = {
+    type: sheetKind,
+    title: $("f_title").value.trim(), titleJa: $("f_titleJa").value.trim(), author: $("f_author").value.trim(),
+    status: $("f_status").value, pubStatus: $("f_pub").value,
+    score: parseInt($("f_score").value, 10) || 0, notes: $("f_notes").value.trim(), updatedAt: Date.now()
+  };
+  d[L.P] = n("f_vol") || 0; d[L.T] = n("f_total");
+  if (sheetKind === "games") { const h = parseFloat($("f_vol").value); d[L.P] = isNaN(h) ? 0 : r1(Math.max(0, h)); }
+  if (sheetKind === "manga") d.chaptersRead = n("f_ch") || 0;
+  if (sheetKind === "games") { d.platform = $("f_platform").value; d.prio = $("f_prio").value; }
+  if (sheetKind === "books"){ d.lang = $("f_lang").value; d.booksRead = n("f_books") || 0; d.totalBooks = n("f_tbooks"); }
+  if (sheetKind === "comics"){ d.comicUnit = $("f_unit").value; d.publisher = $("f_publisher").value.trim(); }
+  return d;
+}
+
+let fillCtl;
+const PROMPTS = {
+  comics: name => `You help fill a comics reading tracker (Western and European comics). The user typed "${name}".
+List the distinct comic series that match, most relevant first, up to 20. Be comprehensive: major characters have many runs/volumes with the same name (e.g. Batman 1940, 2011 New 52, 2016 Rebirth, plus Detective Comics, Batman: The Dark Knight, Batman: Black Label minis...), so list each run separately and put the start year in the title, like "Batman (2016)". Include well-known limited series and graphic novels that carry the name.
+Reply with ONLY JSON: {"options":[{"title": string, "years": e.g. "2015–2017", "author": main writer & artist, "publisher": string, "unit": "albums" for European/Franco-Belgian albums, "volumes" if mainly read as collected editions, otherwise "issues", "total": how many of that unit exist (integer) or null, "pubStatus": "ongoing" or "finished", "note": max 8 words on what makes this one distinct}]}
+If nothing matches, reply {"options":[]}.`,
+  anime: name => `You help fill an anime tracker. The user typed "${name}".
+List the matching anime entries, most relevant first, up to 20: first the whole TV series combined (all seasons together), then each season/part separately, then notable movies or spin-offs.
+Reply with ONLY JSON: {"options":[{"title": string, "titleJa": original Japanese title, "years": e.g. "2013–2023", "author": main animation studio, "total": number of episodes (integer) or null, "pubStatus": "ongoing" if still airing else "finished", "note": max 8 words, e.g. "All seasons combined" or "Season 2"}]}
+If nothing matches, reply {"options":[]}.`,
+  books: name => `You help fill a book reading tracker. The user typed "${name}" (it may be in Hebrew or English).
+List the matching books, most relevant first, up to 20. IMPORTANT: if the match belongs to a series, FIRST give one option for the whole series (books = number of books in it, chapters = null, note "Whole series, N books"), THEN list EVERY book of that series as a separate option in reading order (books = 1, note "Book N of <series>"). Example: Night School by C.J. Daugherty has 5 books: Night School, Legacy, Fracture, Resistance, Endgame. After that, add other books with similar titles.
+The user reads in both Hebrew and English, so give both titles for every option.
+Reply with ONLY JSON: {"options":[{"titleEn": English title (series name for the whole-series option), "titleHe": Hebrew translation title if one exists, else "", "years": year(s) published, "author": author name, "books": integer, "chapters": number of chapters in this single book (integer) or null, "pubStatus": "ongoing" if more books in the series are still coming out, else "finished", "note": max 8 words}]}
+If nothing matches, reply {"options":[]}.`,
+  games: name => `You help fill a video game tracker. The user typed "${name}".
+List the matching games, most relevant first, up to 20: the game, its sequels/prequels, remakes/remasters and major DLC or expansions.
+Reply with ONLY JSON: {"options":[{"title": official title, "titleJa": original Japanese title if a Japanese game, else "", "years": release year, "author": main developer, "total": approximate hours to beat the main story (integer, like HowLongToBeat) or null, "note": max 8 words, e.g. platforms or "Remake of the 1997 game"}]}
+If nothing matches, reply {"options":[]}.`,
+  manga: name => `You help fill a manga reading tracker. The user typed "${name}".
+List the matching manga series, most relevant first, up to 20 (the main series, then sequels, spin-offs or same-name works).
+Reply with ONLY JSON: {"options":[{"title": official English or romanized title, "titleJa": original Japanese title, "years": e.g. "1997–", "author": author name in English, "total": tankobon volumes published so far (integer) or null, "pubStatus": "ongoing" or "finished", "note": max 8 words on what it is}]}
+If nothing matches, reply {"options":[]}.`
+};
+
+const bookTitles = (r, lang) => {
+  const main = lang === "he" ? (r.titleHe || r.titleEn || r.title) : (r.titleEn || r.title || r.titleHe);
+  const other = [r.titleEn, r.titleHe].find(t => t && t !== main) || "";
+  return [main, other];
+};
+let picked = null;
+function applyOption(r){
+  picked = r;
+  if (sheetKind === "books"){
+    const [main, other] = bookTitles(r, $("f_lang").value);
+    $("f_title").value = main || ""; $("f_titleJa").value = other;
+  } else {
+    if (r.title) $("f_title").value = r.title;
+    if (r.titleJa) $("f_titleJa").value = r.titleJa;
+  }
+  if (r.author) $("f_author").value = r.author;
+  if (sheetKind === "books"){
+    $("f_tbooks").value = Number.isInteger(r.books) && r.books > 1 ? r.books : "";
+    $("f_total").value = Number.isInteger(r.chapters) ? r.chapters : "";
+  } else if (Number.isInteger(r.total)) $("f_total").value = r.total;
+  if (r.pubStatus === "ongoing" || r.pubStatus === "finished") $("f_pub").value = r.pubStatus;
+  if (sheetKind === "comics"){
+    if (r.publisher) $("f_publisher").value = r.publisher;
+    if (UNITS[r.unit]) { $("f_unit").value = r.unit; setUnitLabels(); }
+  }
+  $("suggest").hidden = true;
+  $("fillHint").textContent = Number.isInteger(r.total)
+    ? "מולא אוטומטית. כדאי לבדוק את המספרים."
+    : "מולא אוטומטית, אבל בלי הכמות הכוללת. אפשר להוסיף אותה ידנית.";
+}
+
+let options = [], lastQuery = "", searchPage = 1;
+async function autoFill(more){
+  const name = more === true ? lastQuery : $("f_title").value.trim(); if (!name || !sample) return;
+  if (more !== true) options = [];
+  lastQuery = name;
+  fillCtl?.abort(); fillCtl = new AbortController();
+  $("fillBtn").disabled = true;
+  const moreBtn = $("suggest").querySelector(".more");
+  if (more === true && moreBtn) { moreBtn.disabled = true; moreBtn.textContent = "מחפש עוד…"; }
+  else { $("suggest").hidden = true; $("fillHint").textContent = "מחפש התאמות…"; }
+  let prompt = PROMPTS[sheetKind](name);
+  if (more === true) prompt += `\n\nThe user already saw these, so do NOT repeat them; list up to 20 OTHER matches:\n${options.map(o => "- " + o.title).join("\n")}`;
+  try {
+    searchPage = more === true ? searchPage + 1 : 1;
+    const r = {options: await TS.SEARCH[sheetKind](name, searchPage, fillCtl.signal)};
+    const seen = new Set(options.map(o => String(o.title).toLowerCase()));
+    const fresh = (Array.isArray(r?.options) ? r.options : []).map(o => o && !o.title ? {...o, title: o.titleEn || o.titleHe} : o).filter(o => o && o.title && !seen.has(String(o.title).toLowerCase())).slice(0, 20);
+    if (more === true && !fresh.length){ if (moreBtn) { moreBtn.textContent = "אין עוד התאמות"; } return; }
+    options = options.concat(fresh);
+    if (!options.length){ $("fillHint").textContent = "לא נמצאה התאמה. אפשר למלא ידנית."; return; }
+    if (options.length === 1 && more !== true) return applyOption(options[0]);
+    $("fillHint").textContent = `בחר את הגרסה שאתה מתכוון אליה (${options.length}). אפשר גם לחדד, למשל "Batman Tom King".`;
+    $("suggest").innerHTML = options.map((o, i) => `
+      <button type="button" class="opt" data-i="${i}">
+        <b dir="auto">${esc(sheetKind === "books" ? bookTitles(o, $("f_lang").value)[0] : o.title)}</b>
+        <span>${[esc(o.years), esc(o.author), esc(o.publisher), sheetKind === "books" ? (o.books > 1 ? `${o.books} ספרים` : Number.isInteger(o.chapters) ? `${o.chapters} פרקים` : "") : Number.isInteger(o.total) ? `${o.total} ${(sheetKind === "comics" ? (UNITS[o.unit] || UNITS.issues)[1] : K[sheetKind].units)}` : ""].filter(Boolean).join(" · ")}</span>
+        ${sheetKind === "books" && bookTitles(o, $("f_lang").value)[1] ? `<span dir="auto">${esc(bookTitles(o, $("f_lang").value)[1])}</span>` : ""}
+        ${o.note ? `<em dir="auto">${esc(o.note)}</em>` : ""}
+      </button>`).join("") + `<button type="button" class="opt more">עוד אפשרויות</button>`;
+    $("suggest").hidden = false;
+  } catch (e) {
+    if (e?.code === "cancelled" || e?.name === "AbortError") return;
+    if (["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(e?.code)){ sample = null; $("fillBtn").hidden = true; $("fillHint").textContent = ""; return; }
+    $("fillHint").textContent = e?.code === "rate_limited" ? "יותר מדי בקשות. נסה שוב עוד מעט." : "החיפוש נכשל. אפשר לנסות שוב או למלא ידנית.";
+  } finally { $("fillBtn").disabled = false; }
+}
+
+
+/* ---------- recommendations ---------- */
+const KIND_EN = {manga: "manga", anime: "anime", comics: "Western/European comics", books: "books", games: "video games"};
+let recs = {}, recsOpen = false, recsCtl;
+try { recs = JSON.parse(localStorage.getItem("dokusho-recs")) || {}; } catch {}
+const saveRecs = () => { try { localStorage.setItem("dokusho-recs", JSON.stringify(recs)); } catch {} };
+
+function renderRecs(){
+  $("recs").hidden = !recsOpen; if (!recsOpen) return;
+  $("recsTitle").textContent = `המלצות ${({manga: "מנגה", anime: "אנימה", comics: "קומיקס", books: "ספרים", games: "משחקים"})[kind]} בשבילך`;
+  const list = recs[kind] || [];
+  const onShelf = new Set(mine().map(x => String(x.title).toLowerCase()));
+  if (!list.length){ $("recsGrid").innerHTML = ""; if (!$("recsHint").dataset.busy) $("recsHint").textContent = mine().length ? "לחץ \"רענן\" כדי לקבל המלצות." : "הוסף כמה סדרות למדף הזה קודם, כדי שיהיה על מה להתבסס."; return; }
+  $("recsGrid").innerHTML = list.map((r, i) => {
+    const added = onShelf.has(String(r.title).toLowerCase());
+    return `<article class="rec">
+      <b dir="auto">${esc(r.title || r.titleEn || r.titleHe)}</b>
+      <span class="meta">${[esc(r.years), esc(r.author), esc(r.publisher)].filter(Boolean).join(" · ")}</span>
+      <p>${esc(r.why)}</p>
+      <button class="mini plus" data-rec="${i}"${added ? " disabled" : ""}>${added ? "כבר במדף" : "+ הוסף למתוכנן"}</button>
+    </article>`; }).join("");
+}
+
+async function getRecs(){
+  if (!sample) return;
+  const list = mine();
+  if (!list.length){ recsOpen = true; renderRecs(); return; }
+  recsCtl?.abort(); recsCtl = new AbortController();
+  const fmt = x => `- ${x.title}${x.author ? ` (${x.author})` : ""}: ${x.status}${x.score ? `, rated ${x.score}/10` : ""}`;
+  const others = items.filter(x => kindOf(x) !== kind && x.score >= 8);
+  const prompt = `You are a recommendation engine for a personal ${KIND_EN[kind]} tracker.
+The user's ${KIND_EN[kind]} history (status: reading = in progress, completed = finished, paused = finished this year, dropped = finished and loved it enough to want to revisit (strongest positive signal), planned = not started yet):
+${list.map(fmt).join("\n")}
+${others.length ? `\nOther things they rated highly (taste signal only):\n${others.map(x => `- ${x.title} (${KIND_EN[kindOf(x)]}): ${x.score}/10`).join("\n")}\n` : ""}
+Recommend 8 ${KIND_EN[kind]} they would likely enjoy, weighting most heavily the "dropped" (want to revisit) items and high scores, then completed/paused ones. Do NOT recommend anything already in their list. Mix famous picks with a couple of less obvious ones.
+Reply with ONLY JSON: {"recs":[{"title": official title, ${kind === "books" ? `"titleEn": English title, "titleHe": Hebrew translation title if one exists else "",` : `"titleJa": original title if not English else "",`} "years": e.g. "2015–2019", "author": ${kind === "anime" ? "studio" : kind === "games" ? "developer" : "author/creators"}, ${kind === "comics" ? `"publisher": string, "unit": "albums" | "volumes" | "issues", ` : ""}"total": ${({manga: "volumes", anime: "episodes", comics: "count of that unit", books: "number of books in the series, 1 if standalone", games: "approx hours to beat main story"})[kind]} (integer) or null, "pubStatus": "ongoing" or "finished", "why": one short sentence IN HEBREW explaining why, referring to a specific title from their list}]}`;
+  recsOpen = true; renderRecs();
+  $("recsHint").dataset.busy = "1";
+  $("recsHint").textContent = "מחפש המלצות…";
+  $("recsRefresh").disabled = true;
+  const k = kind;
+  try {
+    const r = {recs: (await TS.recommend(k, list, recsCtl.signal)) || []};
+    recs[k] = (Array.isArray(r?.recs) ? r.recs : []).filter(x => x && x.title).slice(0, 10);
+    saveRecs();
+    $("recsHint").textContent = recs[k].length ? "" : "לא הצלחתי להפיק המלצות. נסה שוב.";
+  } catch (e) {
+    if (e?.code !== "cancelled") $("recsHint").textContent = e?.code === "rate_limited" ? "יותר מדי בקשות. נסה שוב עוד מעט." : "לא הצלחתי להביא המלצות. נסה שוב.";
+  } finally { delete $("recsHint").dataset.busy; $("recsRefresh").disabled = false; renderRecs(); }
+}
+
+async function addRec(i){
+  const r = (recs[kind] || [])[i]; if (!r) return;
+  const L = K[kind];
+  let title = r.title || r.titleEn || r.titleHe, orig = r.titleJa || "", lang;
+  if (kind === "books"){
+    const he = mine().filter(x => x.lang === "he").length, en = mine().filter(x => x.lang === "en").length;
+    lang = he > en && r.titleHe ? "he" : "en";
+    [title, orig] = bookTitles(r, lang);
+  }
+  const d = {type: kind, title, titleJa: orig, ...(lang ? {lang} : {}), author: r.author || "", status: "planned", score: 0, notes: "",
+    pubStatus: r.pubStatus === "ongoing" || r.pubStatus === "finished" ? r.pubStatus : "", createdAt: Date.now(), updatedAt: Date.now()};
+  d[L.P] = 0; d[L.T] = Number.isInteger(r.total) ? r.total : null;
+  if (kind === "books"){ d[L.T] = null; d.booksRead = 0; d.totalBooks = Number.isInteger(r.total) && r.total > 1 ? r.total : null; }
+  if (kind === "comics"){ d.publisher = r.publisher || ""; d.comicUnit = UNITS[r.unit] ? r.unit : "issues"; }
+  if (r.cover) d.coverUrl = r.cover;
+  if (r.malId) d.malId = r.malId;
+  try { await store.add(d); toast(`${r.title} נוסף למתוכנן`); } catch { fail(); }
+}
+
+/* ---------- random pick ---------- */
+const KIND_HE = {manga: "מנגה", anime: "אנימה", comics: "קומיקס", books: "ספר", games: "משחק"};
+let pickScope = "all", pickedItem = null, spinTimer;
+const pool = () => items.filter(x => x.status === "planned" && (pickScope === "all" || (pickScope === "2026" ? x.prio === "2026" : kindOf(x) === kind)));
+function showPick(x, final){
+  const art = x.coverUrl ? `<div class="art"><img src="${esc(x.coverUrl)}" alt=""></div>`
+    : `<div class="art" style="--h:${hue(x.title)}">${esc(x.titleJa || x.title)}</div>`;
+  $("pickCard").className = "pickCard" + (final ? "" : " spin");
+  $("pickCard").innerHTML = `<span class="kindTag">${KIND_HE[kindOf(x)]}</span>${art}<h3 id="pickHead" dir="auto">${esc(x.title)}</h3>
+    ${final ? `<p>${[esc(x.author), T(x) ? `${T(x)} ${unitOf(x)[1]}` : "", isSeries(x) ? `${x.totalBooks} ספרים` : ""].filter(Boolean).join(" · ")}</p>` : ""}`;
+}
+function roll(){
+  clearInterval(spinTimer);
+  const list = pool();
+  $("pickStart").disabled = $("pickAgain").disabled = !list.length;
+  if (!list.length){
+    pickedItem = null;
+    $("pickCard").className = "pickCard";
+    $("pickCard").innerHTML = `<h3 id="pickHead">אין כלום במתוכנן</h3><p>${pickScope === "all" ? "סמן כמה דברים כ\"מתוכנן\" ואז אפשר להגריל." : `אין פריטים מתוכננים במדף ה${KIND_HE[kind]}. נסה "מכל המדפים".`}</p>`;
+    return;
+  }
+  const choice = list[Math.floor(Math.random() * list.length)];
+  pickedItem = choice;
+  if (list.length < 2 || matchMedia("(prefers-reduced-motion: reduce)").matches) return showPick(choice, true);
+  let n = 0;
+  spinTimer = setInterval(() => {
+    if (++n >= 12){ clearInterval(spinTimer); showPick(choice, true); return; }
+    showPick(list[Math.floor(Math.random() * list.length)], false);
+  }, 70);
+}
+function openPick(){
+  $("pickKindBtn").textContent = `רק ${({manga: "מנגה", anime: "אנימה", comics: "קומיקס", books: "ספרים", games: "משחקים"})[kind]}`;
+  document.querySelectorAll("[data-scope]").forEach(b => b.setAttribute("aria-pressed", b.dataset.scope === pickScope));
+  $("pickOverlay").hidden = false; roll();
+}
+const closePick = () => { clearInterval(spinTimer); $("pickOverlay").hidden = true; };
+
+/* ---------- wiring ---------- */
+$("pickBtn").addEventListener("click", openPick);
+$("pickAgain").addEventListener("click", roll);
+$("pickClose").addEventListener("click", closePick);
+$("pickOverlay").addEventListener("click", e => {
+  if (e.target === $("pickOverlay")) return closePick();
+  const sc = e.target.closest("[data-scope]");
+  if (sc){ pickScope = sc.dataset.scope; document.querySelectorAll("[data-scope]").forEach(b => b.setAttribute("aria-pressed", b === sc)); roll(); }
+});
+$("pickStart").addEventListener("click", () => {
+  const x = pickedItem; if (!x) return;
+  closePick();
+  x.status = "reading"; x.updatedAt = Date.now();
+  kind = kindOf(x); filter = defaultFilter(kind);
+  try { localStorage.setItem("dokusho-kind", kind); } catch {}
+  render();
+  store.patch(x.id, {status: "reading", updatedAt: x.updatedAt}).then(() => toast(`בהצלחה עם ${x.title}!`)).catch(fail);
+});
+for (let i = 10; i >= 1; i--) $("f_score").insertAdjacentHTML("beforeend", `<option value="${i}">${i}</option>`);
+$("f_unit").addEventListener("change", setUnitLabels);
+$("f_lang").addEventListener("change", () => {
+  if (picked && sheetKind === "books"){ const [m, o] = bookTitles(picked, $("f_lang").value); $("f_title").value = m || ""; $("f_titleJa").value = o; }
+});
+$("recsBtn").addEventListener("click", () => { recsOpen = true; if (!(recs[kind] || []).length) getRecs(); else renderRecs(); });
+$("recsRefresh").addEventListener("click", getRecs);
+$("recsClose").addEventListener("click", () => { recsOpen = false; recsCtl?.abort(); renderRecs(); });
+$("yearEndBtn").addEventListener("click", async () => {
+  const b = $("yearEndBtn"), list = mine().filter(x => x.status === "paused");
+  if (!list.length) return;
+  if (!b.dataset.armed){ b.dataset.armed = "1"; b.textContent = `לחץ שוב: ${list.length} יעברו ל"סיימתי"`; setTimeout(() => { b.dataset.armed = ""; renderYearEnd(); }, 4000); return; }
+  b.dataset.armed = ""; b.disabled = true;
+  const now = Date.now();
+  list.forEach(x => { x.status = "completed"; });
+  render();
+  let failed = 0;
+  for (const x of list){ try { await store.patch(x.id, {status: "completed", updatedAt: now}); } catch { failed++; } }
+  b.disabled = false;
+  toast(failed ? `${failed} לא נשמרו. נסה שוב.` : `${list.length} הועברו ל"סיימתי". שנה חדשה, מדף חדש!`);
+});
+$("recsGrid").addEventListener("click", e => { const b = e.target.closest("[data-rec]"); if (b) addRec(+b.dataset.rec); });
+$("kinds").addEventListener("click", e => {
+  const b = e.target.closest(".kind"); if (!b || b.dataset.kind === kind) return;
+  recsCtl?.abort();
+  kind = b.dataset.kind; filter = defaultFilter(kind); prioFilter = "all";
+  try { localStorage.setItem("dokusho-kind", kind); } catch {}
+  render();
+});
+
+$("addForm").addEventListener("submit", e => { e.preventDefault(); openSheet(null, $("addTitle").value.trim()); });
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  filter = b.dataset.k;
+  render();
+});
+$("prios").addEventListener("click", e => { const b = e.target.closest(".tab"); if (b){ prioFilter = b.dataset.p; render(); } });
+$("q").addEventListener("input", renderShelf);
+$("sort").addEventListener("change", () => { renderShelf(); renderMore(); });
+$("hoursF").addEventListener("change", () => { renderShelf(); renderMore(); });
+$("folderSel").addEventListener("change", e => { filter = e.target.value; render(); });
+var moreOpen = false;
+function renderMore(){
+  const g = kind === "games";
+  $("moreBtn").hidden = !g;
+  $("moreBox").className = "moreBox" + (g ? (moreOpen ? " open" : " closed") : "");
+  $("moreBtn").setAttribute("aria-expanded", g && moreOpen);
+  const n = g ? [$("platF").value !== "Steam", $("hoursF").value !== "all", $("sort").value !== "hours"].filter(Boolean).length : 0;
+  $("moreN").textContent = n ? n : "";
+}
+$("moreBtn").addEventListener("click", () => { moreOpen = !moreOpen; renderMore(); });
+$("platF").addEventListener("change", () => { render(); });
+$("shelf").addEventListener("change", e => {
+  const fo = e.target.closest("[data-folder]");
+  if (fo){
+    const x = items.find(i => i.id === fo.dataset.folder); if (!x) return;
+    const patch = {...folderPatch(fo.value), updatedAt: Date.now()};
+    Object.assign(x, patch); render();
+    return store.patch(x.id, patch).then(() => toast(`הועבר ל: ${FOLDER_L[fo.value]}`)).catch(fail);
+  }
+  const st = e.target.closest("[data-status]"), sc = e.target.closest("[data-score]");
+  const id = (st || sc)?.dataset.status || (st || sc)?.dataset.score; if (!id) return;
+  const x = items.find(i => i.id === id); if (!x) return;
+  const patch = st ? {status: st.value} : {score: parseInt(sc.value, 10) || 0};
+  patch.updatedAt = Date.now();
+  Object.assign(x, patch); render();
+  store.patch(id, patch).then(() => toast(st ? `הסטטוס עודכן: ${statusLabel(patch.status, kindOf(x))}` : patch.score ? `ציון ${patch.score} נשמר` : "הציון הוסר")).catch(fail);
+});
+function openDetail(id){
+  const x = items.find(i => i.id === id); if (!x) return;
+  const k = kindOf(x), K0 = K[k];
+  const facts = [
+    [K0.who, esc(x.author)],
+    [kindOf(x) === "comics" ? "הוצאה" : "", esc(x.publisher)],
+    [kindOf(x) === "games" ? "פלטפורמה" : "", esc(x.platform)],
+    ["סטטוס", `<span class="pill s-${x.status}">${statusLabel(x.status, k)}</span>`],
+    ["התקדמות", progressText(x)],
+    [kindOf(x) === "games" ? "" : "ציון", x.score ? `★ ${x.score}` : ""],
+    [kindOf(x) === "games" ? "" : (k === "anime" ? "שידור" : "פרסום"), x.pubStatus === "ongoing" ? (K0.ongoing || "עדיין יוצא") : x.pubStatus === "finished" ? "הסתיימה" : ""],
+    [kindOf(x) === "books" ? "שפה" : "", x.lang === "en" ? "אנגלית" : x.lang === "he" ? "עברית" : ""],
+  ].filter(([l, v]) => l && v);
+  $("detail").innerHTML = `
+    <button class="dClose" type="button" id="dClose" aria-label="סגור">✕</button>
+    ${x.coverUrl ? `<div class="dCover"><img src="${esc(x.hiCoverUrl || x.coverUrl)}" alt="כריכה של ${esc(x.title)}"></div>`
+      : `<div class="dCover" style="background:hsl(${hue(x.title)} var(--spine-s) var(--spine-l))">${esc(x.titleJa || x.title)}</div>`}
+    <div class="dBody">
+      <span class="pill" style="align-self:flex-start;color:var(--accent)">${KIND_HE[k]}</span>
+      <h2 id="dTitle" dir="auto">${esc(x.title)}</h2>
+      ${x.titleJa ? `<p class="orig" dir="auto">${esc(x.titleJa)}</p>` : ""}
+      ${T(x) || isSeries(x) ? `<div class="bar"><i style="width:${pct(x)}%"></i></div>` : ""}
+      <dl class="dFacts">${facts.map(([l, v]) => `<dt>${l}</dt><dd>${v}</dd>`).join("")}</dl>
+      ${x.notes ? `<p class="dNotes" dir="auto">${esc(x.notes)}</p>` : ""}
+      <div class="acts">
+        ${x.malId ? `<a class="mini" href="https://myanimelist.net/${k === "anime" ? "anime" : "manga"}/${x.malId}" target="_blank" rel="noopener">פתח ב-MAL</a>` : ""}
+        <button class="mini" type="button" data-dedit="${x.id}">עריכה</button>
+      </div>
+    </div>`;
+  $("detailOverlay").hidden = false;
+  $("dClose").focus();
+}
+const closeDetail = () => { $("detailOverlay").hidden = true; };
+$("detailOverlay").addEventListener("click", e => {
+  if (e.target === $("detailOverlay") || e.target.closest("#dClose")) return closeDetail();
+  const ed = e.target.closest("[data-dedit]"); if (ed){ closeDetail(); openSheet(ed.dataset.dedit); }
+});
+$("shelf").addEventListener("click", e => {
+  const op = e.target.closest("[data-open]"); if (op) return openDetail(op.dataset.open);
+  const p = e.target.closest("[data-plus]"); if (p) return plusOne(p.dataset.plus);
+  const bk = e.target.closest("[data-book]"); if (bk) return plusBook(bk.dataset.book);
+  const dn = e.target.closest("[data-done]");
+  if (dn){
+    const x = items.find(i => i.id === dn.dataset.done); if (!x) return;
+    const patch = {status: "completed", updatedAt: Date.now()};
+    Object.assign(x, patch); render();
+    return store.patch(x.id, patch).then(() => toast(`סיימת את ${x.title} 🎉`)).catch(fail);
+  }
+  const bb = e.target.closest("[data-back]");
+  if (bb){
+    const x = items.find(i => i.id === bb.dataset.back); if (!x) return;
+    x.status = "planned"; x.updatedAt = Date.now(); render();
+    return store.patch(x.id, {status: "planned", updatedAt: x.updatedAt}).then(() => toast(`${x.title} חזר למתוכנן`)).catch(fail);
+  }
+  const ed = e.target.closest("[data-edit]"); if (ed) openSheet(ed.dataset.edit);
+});
+$("fillBtn").addEventListener("click", () => autoFill());
+let typeTimer;
+$("f_title").addEventListener("input", () => {
+  clearTimeout(typeTimer);
+  if (editingId || !sample) return;
+  const v = $("f_title").value.trim();
+  if (v.length < 3) { fillCtl?.abort(); $("suggest").hidden = true; $("fillHint").textContent = ""; return; }
+  $("fillHint").textContent = "ממשיך להקליד…";
+  typeTimer = setTimeout(() => autoFill(), 900);
+});
+$("suggest").addEventListener("click", e => { const b = e.target.closest(".opt"); if (!b) return; if (b.classList.contains("more")) autoFill(true); else applyOption(options[+b.dataset.i]); });
+$("cancelBtn").addEventListener("click", closeSheet);
+$("overlay").addEventListener("click", e => { if (e.target === $("overlay")) closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (!$("overlay").hidden) closeSheet(); if (!$("pickOverlay").hidden) closePick(); if (!$("detailOverlay").hidden) closeDetail(); });
+$("delBtn").addEventListener("click", async () => {
+  const b = $("delBtn");
+  if (!b.dataset.armed){ b.dataset.armed = "1"; b.textContent = "לחץ שוב כדי למחוק"; return; }
+  const id = editingId, coverId = items.find(i => i.id === id)?.coverId; closeSheet();
+  try { await store.remove(id); toast("הסדרה נמחקה"); if (coverId && assets) assets.delete(coverId).catch(() => {}); } catch { fail(); }
+});
+$("sheet").addEventListener("submit", async e => {
+  e.preventDefault();
+  const d = readForm(); if (!d.title) return;
+  const id = editingId, old = id ? items.find(i => i.id === id) : null;
+  const btn = e.submitter; if (btn) { btn.disabled = true; btn.textContent = "שומר…"; }
+  let cover = {};
+  try { if (assets) cover = await saveCover(old); }
+  catch { toast("העלאת הכריכה נכשלה. שאר הפרטים יישמרו."); cover = {}; }
+  if (btn) { btn.disabled = false; btn.textContent = "שמור"; }
+  const oldCover = cover._oldCover; delete cover._oldCover;
+  if (picked && pendingCover === undefined && !(old && old.coverUrl) && picked.cover) cover.coverUrl = picked.cover;
+  if (picked && picked.malId && !(old && old.malId)) cover.malId = picked.malId;
+  if (picked && picked.steamId && !(old && old.steamId)) cover.steamId = picked.steamId;
+  closeSheet();
+  try {
+    if (id) await store.patch(id, {...d, ...cover});
+    else { await store.add({...d, ...cover, createdAt: Date.now()}); $("addTitle").value = ""; toast(`${d.title} נוסף למדף`); }
+    if (oldCover) assets.delete(oldCover).catch(() => {});
+  } catch { fail(); }
+});
+$("f_cover").addEventListener("change", e => takeCover(e.target.files[0]));
+$("coverRemove").addEventListener("click", () => { pendingCover = null; $("f_cover").value = ""; showCoverPreview(""); });
+document.addEventListener("paste", e => {
+  if ($("overlay").hidden || !assets) return;
+  const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith("image/"));
+  if (f) { e.preventDefault(); takeCover(f); }
+});
+const pick = $("coverPick");
+pick.addEventListener("dragover", e => { e.preventDefault(); pick.classList.add("drag"); });
+pick.addEventListener("dragleave", () => pick.classList.remove("drag"));
+pick.addEventListener("drop", e => { e.preventDefault(); pick.classList.remove("drag"); takeCover(e.dataTransfer.files[0]); });
+
+/* ---------- boot ---------- */
+render();
+(async () => {
+  if (!TS.ready){ store = localStore(); $("notice").hidden = false; store.start(list => { items = list; render(); }); return; }
+  let ses = await TS.session();
+  if (!ses) ses = await TS.loginUI();
+  const uid = ses.user.id;
+  store = TS.cloudStore(uid, toast);
+  sample = {}; assets = TS.coverStore(uid);
+  $("fillBtn").hidden = false;
+  try { await store.start(list => { items = list; render(); }); } catch (e) { toast("לא הצלחתי לטעון את הרשימה. בדוק חיבור ורענן."); }
+  if (!items.length){
+    try { if (await TS.importSeed(uid, (n, t) => toast(`מעביר את הרשימה… ${n}/${t}`))) { toast("הרשימה הועברה!"); setTimeout(() => location.reload(), 800); return; } } catch (e) { toast("ההעברה נכשלה: " + (e.message || e)); }
+  }
+  TS.getMeta("steam").then(m => { steamMeta = (m && m.games) || {}; render(); }).catch(() => {});
+  if (!$("overlay").hidden) $("coverPick").hidden = !assets;
+  $("signout").addEventListener("click", () => TS.signOut());
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
